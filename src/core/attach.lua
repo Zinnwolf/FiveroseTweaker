@@ -1,0 +1,420 @@
+return function(api)
+	local env = getgenv()
+	local core = game:GetService('CoreGui')
+	local timeout = math.clamp(tonumber(env.fiverosetweaker_attach_timeout) or 15, 1, 60)
+
+	local function alive(obj)
+		return typeof(obj) == 'Instance' and obj.Parent ~= nil
+	end
+
+	local function inside(obj, root)
+		return alive(obj) and alive(root) and (obj == root or obj:IsDescendantOf(root))
+	end
+
+	local function scoregui(gui)
+		if not alive(gui) or not gui:IsA('ScreenGui') then
+			return -1
+		end
+
+		local score = 0
+
+		for _, obj in ipairs(gui:GetDescendants()) do
+			if obj:IsA('TextLabel') or obj:IsA('TextButton') or obj:IsA('TextBox') then
+				local text = tostring(obj.Text):lower()
+
+				if text:find('fiverose', 1, true) then
+					score = score + 500
+				end
+
+				if text == 'account' or text == 'script status' then
+					score = score + 100
+				elseif text == 'no charge timeout' or text == 'infinite stamina' then
+					score = score + 250
+				elseif text == 'auto defense' or text == 'instant actions' then
+					score = score + 100
+				end
+			end
+		end
+
+		return score
+	end
+
+	local function findguis()
+		local list = {}
+		local seen = {}
+		local map = rawget(env, 'fiverosemapper')
+		local mapped = type(map) == 'table' and rawget(map, 'library')
+		local mappedgui = type(mapped) == 'table' and rawget(mapped, 'ScreenGui')
+
+		local function add(gui)
+			if alive(gui) and gui:IsA('ScreenGui') and not seen[gui] then
+				seen[gui] = true
+				list[#list + 1] = gui
+			end
+		end
+
+		add(mappedgui)
+
+		if type(gethui) == 'function' then
+			local ok, hui = pcall(gethui)
+
+			if ok and alive(hui) then
+				if hui:IsA('ScreenGui') then
+					add(hui)
+				end
+
+				for _, obj in ipairs(hui:GetDescendants()) do
+					if obj:IsA('ScreenGui') then
+						add(obj)
+					end
+				end
+			end
+		end
+
+		for _, obj in ipairs(core:GetDescendants()) do
+			if obj:IsA('ScreenGui') then
+				add(obj)
+			end
+		end
+
+		if type(getinstances) == 'function' then
+			local ok, instances = pcall(getinstances)
+
+			if ok and type(instances) == 'table' then
+				for _, obj in ipairs(instances) do
+					if typeof(obj) == 'Instance' and obj:IsA('ScreenGui') then
+						add(obj)
+					end
+				end
+			end
+		end
+
+		local ranked = {}
+
+		for _, gui in ipairs(list) do
+			local score = scoregui(gui)
+
+			if score >= 500 or gui == mappedgui then
+				ranked[#ranked + 1] = {gui = gui, score = score}
+			end
+		end
+
+		table.sort(ranked, function(a, b)
+			return a.score > b.score
+		end)
+
+		local result = {}
+
+		for _, item in ipairs(ranked) do
+			result[#result + 1] = item.gui
+		end
+
+		return result
+	end
+
+	local function valid(lib)
+		if type(lib) ~= 'table' then
+			return false
+		end
+
+		local win = rawget(lib, 'Window')
+
+		if type(win) ~= 'table' then
+			return false
+		end
+
+		local ok, add = pcall(function()
+			return win.AddTab
+		end)
+
+		return ok and type(add) == 'function'
+			and type(rawget(lib, 'Tabs')) == 'table'
+			and type(rawget(lib, 'Toggles')) == 'table'
+			and type(rawget(lib, 'Options')) == 'table'
+	end
+
+	local function linked(lib, gui)
+		if not valid(lib) or not alive(gui) then
+			return false
+		end
+
+		local screen = rawget(lib, 'ScreenGui')
+		local holder = rawget(lib, 'WindowContainer')
+
+		if screen == gui or inside(screen, gui) or inside(gui, screen) or inside(holder, gui) then
+			return true
+		end
+
+		for _, toggle in pairs(rawget(lib, 'Toggles')) do
+			local container = type(toggle) == 'table' and rawget(toggle, 'Container')
+
+			if inside(container, gui) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	local function findlib(gui)
+		local map = rawget(env, 'fiverosemapper')
+		local mapped = type(map) == 'table' and rawget(map, 'library')
+
+		if linked(mapped, gui) then
+			return mapped
+		end
+
+		local best
+		local bestscore = -1
+		local seen = {}
+
+		local function scan(lib)
+			if seen[lib] or not linked(lib, gui) then
+				return
+			end
+
+			seen[lib] = true
+
+			local score = 0
+			local screen = rawget(lib, 'ScreenGui')
+			local holder = rawget(lib, 'WindowContainer')
+
+			if screen == gui then
+				score = score + 5000
+			elseif inside(screen, gui) or inside(gui, screen) then
+				score = score + 3000
+			end
+
+			if inside(holder, gui) then
+				score = score + 1500
+			end
+
+			for _, name in ipairs({'NoChargeTimeout', 'InfiniteStamina', 'AutoDive'}) do
+				local toggle = rawget(rawget(lib, 'Toggles'), name)
+				local container = type(toggle) == 'table' and rawget(toggle, 'Container')
+
+				if inside(container, gui) then
+					score = score + 1500
+					break
+				end
+			end
+
+			if score > bestscore then
+				best = lib
+				bestscore = score
+			end
+		end
+
+		if type(getgc) == 'function' then
+			local ok, objects = pcall(getgc, true)
+
+			if ok and type(objects) == 'table' then
+				for _, obj in ipairs(objects) do
+					scan(obj)
+				end
+			end
+		end
+
+		if type(getreg) == 'function' then
+			local ok, objects = pcall(getreg)
+
+			if ok and type(objects) == 'table' then
+				local count = 0
+
+				for _, obj in pairs(objects) do
+					count = count + 1
+
+					if count > 10000 then
+						break
+					end
+
+					scan(obj)
+				end
+			end
+		end
+
+		return best
+	end
+
+	local function destroy(obj)
+		if type(obj) == 'table' and type(rawget(obj, 'Destroy')) == 'function' then
+			pcall(obj.Destroy, obj)
+			return
+		end
+
+		if alive(obj) then
+			pcall(obj.Destroy, obj)
+		end
+	end
+
+	local function removetab(lib, tabs, key, tab, fallback)
+		local active = rawget(lib, 'ActiveTab') == tab
+
+		if active then
+			local ok, hide = pcall(function()
+				return tab.Hide
+			end)
+
+			if ok and type(hide) == 'function' then
+				pcall(hide, tab)
+			end
+
+			if rawget(lib, 'ActiveTab') == tab then
+				lib.ActiveTab = nil
+			end
+		end
+
+		if type(tab) == 'table' and type(rawget(tab, 'Destroy')) == 'function' then
+			pcall(tab.Destroy, tab)
+		else
+			for _, side in ipairs(type(tab) == 'table' and rawget(tab, 'Sides') or {}) do
+				destroy(side)
+			end
+
+			for _, name in ipairs({'Button', 'ButtonHolder', 'Container'}) do
+				destroy(type(tab) == 'table' and rawget(tab, name))
+			end
+		end
+
+		if tabs[key] == tab then
+			tabs[key] = nil
+		end
+
+		if active and fallback and rawget(lib, 'Unloaded') ~= true then
+			for _, item in pairs(tabs) do
+				local ok, show = pcall(function()
+					return item.Show
+				end)
+
+				if item ~= tab and ok and type(show) == 'function' then
+					pcall(show, item)
+					break
+				end
+			end
+		end
+	end
+
+	local started = os.clock()
+	local gui
+	local lib
+
+	repeat
+		api:active()
+
+		for _, candidate in ipairs(findguis()) do
+			local found = findlib(candidate)
+
+			if found then
+				gui = candidate
+				lib = found
+				break
+			end
+		end
+
+		if lib then
+			break
+		end
+
+		task.wait(0.25)
+	until os.clock() - started >= timeout
+
+	api:active()
+
+	if not gui then
+		error('real Fiverose ScreenGui not found within '..timeout..'s')
+	end
+
+	if not lib then
+		error('live Fiverose Obsidian library not found within '..timeout..'s')
+	end
+
+	api:active()
+
+	local win = rawget(lib, 'Window')
+	local tabs = rawget(lib, 'Tabs')
+	local native = type(api.game) == 'table'
+		and type(api.game.family) == 'table'
+		and api.game.family.native == true
+
+	for key, old in pairs(tabs) do
+		local name = tostring(key):lower()
+		local tabname = type(old) == 'table'
+			and tostring(rawget(old, 'Name') or ''):lower()
+			or ''
+
+		if name == 'fiverosetweaker' or tabname == 'fiverosetweaker' then
+			removetab(lib, tabs, key, old, false)
+		end
+	end
+
+	local tab
+
+	if native then
+		tab = win:AddTab({
+			Name = 'FiveroseTweaker',
+			Icon = 'wrench'
+		})
+	end
+
+	api.lib = lib
+	api.win = win
+	api.gui = gui
+	api.tab = tab
+	api.tabs = tabs
+	api.toggles = rawget(lib, 'Toggles')
+	api.options = rawget(lib, 'Options')
+	api.owned = {}
+
+	function api:own(id)
+		self.owned[id] = true
+		return id
+	end
+
+	function api:disown(id)
+		self.owned[id] = nil
+
+		if self.nokey then
+			self.nokey[id] = nil
+		end
+	end
+
+	function api:notify(title, text, time)
+		return pcall(lib.Notify, lib, {
+			Title = tostring(title),
+			Description = tostring(text),
+			Time = tonumber(time) or 3
+		})
+	end
+
+	if tab then
+		api:clean(function()
+			for key, item in pairs(tabs) do
+				if item == tab then
+					removetab(lib, tabs, key, item, true)
+					break
+				end
+			end
+		end)
+	end
+
+	if type(rawget(lib, 'OnUnload')) == 'function' then
+		local callback = function()
+			api:unload()
+		end
+
+		api:clean(function()
+			local signals = rawget(lib, 'UnloadSignals')
+
+			if type(signals) == 'table' then
+				for index = #signals, 1, -1 do
+					if signals[index] == callback then
+						table.remove(signals, index)
+					end
+				end
+			end
+		end)
+		lib:OnUnload(callback)
+	end
+
+	return api
+end
