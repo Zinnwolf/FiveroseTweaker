@@ -1,6 +1,3 @@
-<img width="1535" height="1024" alt="image" src="https://github.com/user-attachments/assets/0a4ae758-4fae-43e2-9417-a981909ca648" />
-
-
 FiveroseTweaker adds things to fiverose
 
 YOU MUST OWN THE REAL FIVEROSE TO USE THIS
@@ -71,4 +68,5 @@ https://fiverose.xyz
 
 https://www.youtube.com/watch?v=lhKpfmeSRKw
 
-<img width="3500" height="2333" alt="logo" src="https://github.com/user-attachments/assets/78989ac2-303f-4ae6-ae69-03f3660efa9a" />
+<img width="1535" height="1024" alt="image" src="https://github.com/user-attachments/assets/6c067a25-d26d-4ca3-8fda-4c8c4d8ebc0c" />
+
