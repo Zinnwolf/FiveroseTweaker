@@ -1,5 +1,7 @@
 # FiveroseTweaker
 
+<img width="3500" height="2333" alt="logo" src="https://github.com/user-attachments/assets/0212d079-a5aa-4492-ab5c-0bc16303e038" />
+
 FiveroseTweaker adds things to fiverose
 
 # YOU MUST OWN THE REAL FIVEROSE TO USE THIS
