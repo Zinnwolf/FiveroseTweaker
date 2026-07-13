@@ -420,6 +420,14 @@ return function(api, root)
 		ColorPicker = {began = true, changed = true, ended = true}
 	}
 
+	local function confunc(con)
+		local ok, fn = pcall(function()
+			return con.Function or con.Callback
+		end)
+
+		return ok and type(fn) == 'function' and fn or nil
+	end
+
 	local function consnapshot(signal)
 		local result = {}
 
@@ -428,18 +436,14 @@ return function(api, root)
 		end
 
 		for _, con in ipairs(getconnections(signal)) do
-			result[con] = true
+			local fn = confunc(con)
+
+			if fn then
+				result[fn] = (result[fn] or 0) + 1
+			end
 		end
 
 		return result
-	end
-
-	local function confunc(con)
-		local ok, fn = pcall(function()
-			return con.Function or con.Callback
-		end)
-
-		return ok and type(fn) == 'function' and fn or nil
 	end
 
 	local function condisconnect(con)
@@ -507,11 +511,15 @@ return function(api, root)
 			local signal = inputsignals[name]
 
 			if signal then
-				for _, con in ipairs(type(getconnections) == 'function' and getconnections(signal) or {}) do
-					if not before[con] then
-						local fn = confunc(con)
+				local current = {}
 
-						if fn then
+				for _, con in ipairs(type(getconnections) == 'function' and getconnections(signal) or {}) do
+					local fn = confunc(con)
+
+					if fn then
+						current[fn] = (current[fn] or 0) + 1
+
+						if current[fn] > (before[fn] or 0) then
 							captured[con] = true
 							item._input[name][#item._input[name] + 1] = fn
 							condisconnect(con)
