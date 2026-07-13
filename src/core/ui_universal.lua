@@ -159,6 +159,7 @@ return function(api, root)
 		tabs = {},
 		wrapped = {},
 		created = {},
+		dropguards = {},
 		serial = 0
 	}
 
@@ -173,6 +174,118 @@ return function(api, root)
 		Window = nil,
 		ActiveTab = nil
 	}
+
+	local function dropdead(obj)
+		local items = type(obj) == 'table' and rawget(obj, 'Items')
+		local elements = type(items) == 'table' and rawget(items, 'DropdownElements')
+
+		if typeof(elements) ~= 'Instance' then
+			return true
+		end
+
+		local ok, parent = pcall(function()
+			return elements.Parent
+		end)
+
+		return not ok or parent == nil
+	end
+
+	local function guarddropdown(obj)
+		if type(obj) ~= 'table' then
+			return obj
+		end
+
+		local items = rawget(obj, 'Items')
+
+		if type(items) ~= 'table'
+			or typeof(rawget(items, 'DropdownElements')) ~= 'Instance'
+			or type(rawget(obj, 'SetVisible')) ~= 'function'
+			or type(rawget(obj, 'Tween')) ~= 'function' then
+
+			return obj
+		end
+
+		for _, guard in ipairs(state.dropguards) do
+			if guard.obj == obj then
+				return obj
+			end
+		end
+
+		local oldvisible = rawget(obj, 'SetVisible')
+		local oldtween = rawget(obj, 'Tween')
+		local safevisible
+		local safetween
+
+		safetween = function(...)
+			if dropdead(obj) then
+				obj.Tweening = false
+				obj.Open = false
+				return
+			end
+
+			return oldtween(...)
+		end
+
+		safevisible = function(...)
+			if dropdead(obj) then
+				obj.Tweening = false
+				obj.Open = false
+				return
+			end
+
+			return oldvisible(...)
+		end
+
+		obj.Tween = safetween
+		obj.SetVisible = safevisible
+		state.dropguards[#state.dropguards + 1] = {
+			obj = obj,
+			oldvisible = oldvisible,
+			oldtween = oldtween,
+			safevisible = safevisible,
+			safetween = safetween
+		}
+
+		return obj
+	end
+
+	for _, obj in ipairs(objects) do
+		guarddropdown(obj)
+	end
+
+	local olddropdown = rawget(lib, 'Dropdown')
+	local safedropdown
+
+	if type(olddropdown) == 'function' then
+		safedropdown = function(...)
+			return guarddropdown(olddropdown(...))
+		end
+
+		lib.Dropdown = safedropdown
+	end
+
+	api:clean(function()
+		if safedropdown and rawget(lib, 'Dropdown') == safedropdown then
+			lib.Dropdown = olddropdown
+		end
+
+		for index = #state.dropguards, 1, -1 do
+			local guard = state.dropguards[index]
+			local obj = guard.obj
+
+			if not dropdead(obj) then
+				if rawget(obj, 'SetVisible') == guard.safevisible then
+					obj.SetVisible = guard.oldvisible
+				end
+
+				if rawget(obj, 'Tween') == guard.safetween then
+					obj.Tween = guard.oldtween
+				end
+			end
+
+			state.dropguards[index] = nil
+		end
+	end)
 
 	local function keyname(value)
 		if typeof(value) == 'EnumItem' then
@@ -289,119 +402,119 @@ return function(api, root)
 		end
 	end
 
-\tlocal function connectionmark()
-\t\tlocal cons = rawget(lib, 'Connections')
-\t\treturn type(cons) == 'table' and #cons or 0
-\tend
+	local function connectionmark()
+		local cons = rawget(lib, 'Connections')
+		return type(cons) == 'table' and #cons or 0
+	end
 
-\tlocal function adoptconnections(item, mark)
-\t\tif type(item) ~= 'table' or rawget(item, '_owned') ~= true then
-\t\t\treturn
-\t\tend
+	local function adoptconnections(item, mark)
+		if type(item) ~= 'table' or rawget(item, '_owned') ~= true then
+			return
+		end
 
-\t\tlocal cons = rawget(lib, 'Connections')
+		local cons = rawget(lib, 'Connections')
 
-\t\tif type(cons) ~= 'table' then
-\t\t\treturn
-\t\tend
+		if type(cons) ~= 'table' then
+			return
+		end
 
-\t\tlocal list = rawget(item, '_connections')
-\t\tlocal found = rawget(item, '_connectionset')
+		local list = rawget(item, '_connections')
+		local found = rawget(item, '_connectionset')
 
-\t\tfor index = (tonumber(mark) or #cons) + 1, #cons do
-\t\t\tlocal con = cons[index]
+		for index = (tonumber(mark) or #cons) + 1, #cons do
+			local con = cons[index]
 
-\t\t\tif con ~= nil and not found[con] then
-\t\t\t\tfound[con] = true
-\t\t\t\tlist[#list + 1] = con
-\t\t\tend
-\t\tend
-\tend
+			if con ~= nil and not found[con] then
+				found[con] = true
+				list[#list + 1] = con
+			end
+		end
+	end
 
-\tlocal function releaseconnections(item)
-\t\tif type(item) ~= 'table' then
-\t\t\treturn
-\t\tend
+	local function releaseconnections(item)
+		if type(item) ~= 'table' then
+			return
+		end
 
-\t\tlocal list = rawget(item, '_connections') or {}
-\t\tlocal found = rawget(item, '_connectionset') or {}
-\t\tlocal native = rawget(item, 'Native')
-\t\tlocal binding = type(native) == 'table' and rawget(native, 'Binding')
+		local list = rawget(item, '_connections') or {}
+		local found = rawget(item, '_connectionset') or {}
+		local native = rawget(item, 'Native')
+		local binding = type(native) == 'table' and rawget(native, 'Binding')
 
-\t\tif binding ~= nil and not found[binding] then
-\t\t\tfound[binding] = true
-\t\t\tlist[#list + 1] = binding
-\t\tend
+		if binding ~= nil and not found[binding] then
+			found[binding] = true
+			list[#list + 1] = binding
+		end
 
-\t\tfor _, con in ipairs(list) do
-\t\t\tpcall(function()
-\t\t\t\tif con.Connected ~= false then
-\t\t\t\t\tcon:Disconnect()
-\t\t\t\tend
-\t\t\tend)
-\t\tend
+		for _, con in ipairs(list) do
+			pcall(function()
+				if con.Connected ~= false then
+					con:Disconnect()
+				end
+			end)
+		end
 
-\t\tlocal cons = rawget(lib, 'Connections')
+		local cons = rawget(lib, 'Connections')
 
-\t\tif type(cons) == 'table' then
-\t\t\tfor index = #cons, 1, -1 do
-\t\t\t\tif found[cons[index]] then
-\t\t\t\t\ttable.remove(cons, index)
-\t\t\t\tend
-\t\t\tend
-\t\tend
+		if type(cons) == 'table' then
+			for index = #cons, 1, -1 do
+				if found[cons[index]] then
+					table.remove(cons, index)
+				end
+			end
+		end
 
-\t\ttable.clear(list)
-\t\ttable.clear(found)
-\tend
+		table.clear(list)
+		table.clear(found)
+	end
 
-\tlocal function trackmethod(item, obj, name)
-\t\tif type(item) ~= 'table'
-\t\t\tor rawget(item, '_owned') ~= true
-\t\t\tor type(obj) ~= 'table' then
+	local function trackmethod(item, obj, name)
+		if type(item) ~= 'table'
+			or rawget(item, '_owned') ~= true
+			or type(obj) ~= 'table' then
 
-\t\t\treturn
-\t\tend
+			return
+		end
 
-\t\tlocal old = rawget(obj, name)
+		local old = rawget(obj, name)
 
-\t\tif type(old) ~= 'function' then
-\t\t\treturn
-\t\tend
+		if type(old) ~= 'function' then
+			return
+		end
 
-\t\tlocal wrapped
+		local wrapped
 
-\t\twrapped = function(...)
-\t\t\tlocal mark = connectionmark()
-\t\t\tlocal result = table.pack(pcall(old, ...))
-\t\t\tadoptconnections(item, mark)
+		wrapped = function(...)
+			local mark = connectionmark()
+			local result = table.pack(pcall(old, ...))
+			adoptconnections(item, mark)
 
-\t\t\tif not result[1] then
-\t\t\t\terror(result[2], 0)
-\t\t\tend
+			if not result[1] then
+				error(result[2], 0)
+			end
 
-\t\t\treturn table.unpack(result, 2, result.n)
-\t\tend
+			return table.unpack(result, 2, result.n)
+		end
 
-\t\tobj[name] = wrapped
-\t\titem._hooks[#item._hooks + 1] = {
-\t\t\tobj = obj,
-\t\t\tname = name,
-\t\t\told = old,
-\t\t\twrapped = wrapped
-\t\t}
-\tend
+		obj[name] = wrapped
+		item._hooks[#item._hooks + 1] = {
+			obj = obj,
+			name = name,
+			old = old,
+			wrapped = wrapped
+		}
+	end
 
-\tlocal function tracknative(item, obj, mark)
-\t\tif type(item) ~= 'table' or rawget(item, '_owned') ~= true then
-\t\t\treturn item
-\t\tend
+	local function tracknative(item, obj, mark)
+		if type(item) ~= 'table' or rawget(item, '_owned') ~= true then
+			return item
+		end
 
-\t\tadoptconnections(item, mark)
-\t\ttrackmethod(item, obj, 'SetVisible')
-\t\ttrackmethod(item, obj, 'Tween')
-\t\treturn item
-\tend
+		adoptconnections(item, mark)
+		trackmethod(item, obj, 'SetVisible')
+		trackmethod(item, obj, 'Tween')
+		return item
+	end
 
 	local function destroyroots(obj, extra)
 		local roots = {}
