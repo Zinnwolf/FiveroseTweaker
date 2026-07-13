@@ -69,3 +69,5 @@ https://fiverose.xyz
 # SHOWCASE
 
 https://www.youtube.com/watch?v=lhKpfmeSRKw
+
+<img width="3500" height="2333" alt="logo" src="https://github.com/user-attachments/assets/78989ac2-303f-4ae6-ae69-03f3660efa9a" />
