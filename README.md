@@ -9,3 +9,5 @@ FiveroseTweaker adds things to fiverose
 ```lua
 loadstring(game:HttpGet('https://raw.githubusercontent.com/Zinnwolf/FiveroseTweaker/main/main.lua', true))()
 ```
+
+# CREDITS TO 7GRANDDADPGN FOR MODULES
