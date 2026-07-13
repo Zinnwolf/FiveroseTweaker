@@ -11,17 +11,45 @@ return function(api, entry)
 	local prior = {}
 	local bridge
 	local uimark = api.ui and api.ui.mark and api.ui:mark()
+	local overlayscreen = Instance.new('ScreenGui')
 	local overlay = Instance.new('Frame')
 
 	for id in pairs(api.owned or {}) do
 		prior[id] = true
 	end
 
-	overlay.Name = 'FiveroseTweakerOverlay'
+	overlayscreen.Name = 'FiveroseTweakerOverlay'
+	overlayscreen.ResetOnSpawn = false
+	overlayscreen.IgnoreGuiInset = true
+	overlayscreen.DisplayOrder = 999999
+	overlayscreen.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	overlayscreen.Enabled = true
+
+	local guiparent = game:GetService('CoreGui')
+
+	if type(gethui) == 'function' then
+		local ok, result = pcall(gethui)
+
+		if ok and typeof(result) == 'Instance' then
+			guiparent = result
+		end
+	elseif typeof(api.gui) == 'Instance' and api.gui.Parent then
+		guiparent = api.gui.Parent
+	end
+
+	if type(protectgui) == 'function' then
+		pcall(protectgui, overlayscreen)
+	elseif syn and type(syn.protect_gui) == 'function' then
+		pcall(syn.protect_gui, overlayscreen)
+	end
+
+	overlayscreen.Parent = guiparent
+
+	overlay.Name = 'Overlay'
 	overlay.Size = UDim2.fromScale(1, 1)
 	overlay.BackgroundTransparency = 1
 	overlay.Active = false
-	overlay.Parent = api.gui
+	overlay.Parent = overlayscreen
 
 	local function slug(value)
 		local name = tostring(value or ''):lower()
@@ -453,6 +481,7 @@ return function(api, entry)
 
 	bridge = {
 		overlay = overlay,
+		overlayscreen = overlayscreen,
 		owned = owned,
 		tabs = replacements
 	}
@@ -487,7 +516,11 @@ return function(api, entry)
 			uimark = nil
 		end
 
-		if overlay then
+		if overlayscreen then
+			pcall(overlayscreen.Destroy, overlayscreen)
+			overlayscreen = nil
+			overlay = nil
+		elseif overlay then
 			pcall(overlay.Destroy, overlay)
 			overlay = nil
 		end
