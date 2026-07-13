@@ -12,7 +12,7 @@ getgenv().SCRIPT_KEY = "put your key here"
 
 loadstring(game:HttpGet("https://api.jnkie.com/api/v1/luascripts/public/4d158afc6a06b4850944ecb0c53a62ff1f1159b5bb869a242689fe5b147d22e2/download"))()
 
-task.wait(8)
+task.wait(10)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/Zinnwolf/FiveroseTweaker/main/main.lua", true))()
 ```
