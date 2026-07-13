@@ -42,3 +42,7 @@ Jailbreak,
 Redliner, 
 Skywars, 
 Universal
+
+# FIVEROSE
+If you are interested in buying fiverose, you can get it here:
+https://fiverose.xyz
