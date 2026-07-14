@@ -1,6 +1,7 @@
 return function(api)
 	local tweenservice = game:GetService('TweenService')
 	local lighting = game:GetService('Lighting')
+	local coregui = game:GetService('CoreGui')
 	local tabs = api.tabs
 	local toggles = api.toggles
 	local id = 'smooth_ui_animations'
@@ -10,13 +11,18 @@ return function(api)
 	local made = {}
 	local tweens = setmetatable({}, {__mode = 'k'})
 	local bound = setmetatable({}, {__mode = 'k'})
-	local scales = setmetatable({}, {__mode = 'k'})
+	local pulseat = setmetatable({}, {__mode = 'k'})
 	local blur
+	local layer
 	local main
 	local lastopen
 
+	local function instance(obj)
+		return typeof(obj) == 'Instance'
+	end
+
 	local function alive(obj)
-		return typeof(obj) == 'Instance' and obj.Parent ~= nil
+		return instance(obj) and obj.Parent ~= nil
 	end
 
 	local function cancel(obj)
@@ -34,11 +40,18 @@ return function(api)
 		end
 
 		cancel(obj)
-		local item = tweenservice:Create(obj, TweenInfo.new(
-			time,
-			style or Enum.EasingStyle.Quint,
-			direction or Enum.EasingDirection.Out
-		), goal)
+		local ok, item = pcall(function()
+			return tweenservice:Create(obj, TweenInfo.new(
+				time,
+				style or Enum.EasingStyle.Quint,
+				direction or Enum.EasingDirection.Out
+			), goal)
+		end)
+
+		if not ok or not item then
+			return
+		end
+
 		tweens[obj] = item
 		item:Play()
 		return item
@@ -55,40 +68,180 @@ return function(api)
 		end
 	end
 
-	local function scale(root, name)
-		if not alive(root) or not root:IsA('GuiObject') then
-			return
-		end
+	local function removelegacy()
+		local gui = api.gui
 
-		local item = scales[root]
-
-		if alive(item) then
-			return item
-		end
-
-		item = Instance.new('UIScale')
-		item.Name = name or 'FiveroseTweakerScale'
-		item.Scale = 1
-		item.Parent = root
-		scales[root] = item
-		made[#made + 1] = item
-		return item
-	end
-
-	local function canvas(root)
-		if not alive(root) then
-			return
-		end
-
-		if root:IsA('CanvasGroup') then
-			return root
-		end
-
-		for _, child in ipairs(root:GetChildren()) do
-			if child:IsA('CanvasGroup') then
-				return child
+		if instance(gui) then
+			for _, obj in ipairs(gui:GetDescendants()) do
+				if obj:IsA('UIScale') and (
+					obj.Name == 'FiveroseTweakerScale'
+					or obj.Name == 'FiveroseTweakerWindowScale'
+					or obj.Name == 'FiveroseTweakerPageScale'
+					or obj.Name == 'FiveroseTweakerHoverScale'
+				) then
+					pcall(obj.Destroy, obj)
+				end
 			end
 		end
+
+		for _, obj in ipairs(lighting:GetChildren()) do
+			if obj:IsA('BlurEffect') and obj.Name == 'FiveroseTweakerBlur' then
+				pcall(obj.Destroy, obj)
+			end
+		end
+	end
+
+	local function getlayer()
+		if alive(layer) then
+			return layer
+		end
+
+		local parent
+
+		if type(gethui) == 'function' then
+			pcall(function()
+				parent = gethui()
+			end)
+		end
+
+		if not instance(parent) then
+			parent = alive(api.gui) and api.gui.Parent or coregui
+		end
+
+		layer = Instance.new('ScreenGui')
+		layer.Name = 'FiveroseTweakerAnimations'
+		layer.ResetOnSpawn = false
+		layer.ZIndexBehavior = Enum.ZIndexBehavior.Global
+		layer.DisplayOrder = 2147483000
+
+		if alive(api.gui) and api.gui:IsA('ScreenGui') then
+			layer.IgnoreGuiInset = api.gui.IgnoreGuiInset
+		else
+			layer.IgnoreGuiInset = true
+		end
+
+		local ok = pcall(function()
+			layer.Parent = parent
+		end)
+
+		if not ok then
+			layer.Parent = coregui
+		end
+
+		made[#made + 1] = layer
+		return layer
+	end
+
+	local function getblur()
+		if alive(blur) then
+			return blur
+		end
+
+		for _, obj in ipairs(lighting:GetChildren()) do
+			if obj:IsA('BlurEffect') and obj.Name == 'FiveroseTweakerBlur' then
+				pcall(obj.Destroy, obj)
+			end
+		end
+
+		blur = Instance.new('BlurEffect')
+		blur.Name = 'FiveroseTweakerBlur'
+		blur.Size = 0
+		blur.Parent = lighting
+		made[#made + 1] = blur
+		return blur
+	end
+
+	local function copycorner(root, frame)
+		local source = alive(root) and root:FindFirstChildOfClass('UICorner')
+
+		if source then
+			local corner = Instance.new('UICorner')
+			corner.CornerRadius = source.CornerRadius
+			corner.Parent = frame
+		end
+	end
+
+	local function pulse(root, kind)
+		if not enabled or not alive(root) or not root:IsA('GuiObject') then
+			return
+		end
+
+		local now = os.clock()
+
+		if now - (pulseat[root] or 0) < 0.08 then
+			return
+		end
+
+		pulseat[root] = now
+		local size = root.AbsoluteSize
+		local pos = root.AbsolutePosition
+
+		if size.X < 4 or size.Y < 4 then
+			return
+		end
+
+		local holder = getlayer()
+
+		if not alive(holder) then
+			return
+		end
+
+		local frame = Instance.new('Frame')
+		frame.Name = 'FiveroseTweakerPulse'
+		frame.Active = false
+		frame.Selectable = false
+		frame.BorderSizePixel = 0
+		frame.BackgroundColor3 = Color3.new(1, 1, 1)
+		frame.BackgroundTransparency = kind == 'open' and 0.965 or 0.977
+		frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		frame.ZIndex = 1000
+
+		local center = UDim2.fromOffset(pos.X + size.X / 2, pos.Y + size.Y / 2)
+		local targetsize = UDim2.fromOffset(size.X, size.Y)
+
+		if kind == 'open' then
+			frame.Position = center
+			frame.Size = UDim2.fromOffset(size.X * 0.94, size.Y * 0.94)
+		elseif kind == 'tab' then
+			frame.Position = center + UDim2.fromOffset(8, 0)
+			frame.Size = targetsize
+		else
+			frame.Position = center
+			frame.Size = targetsize
+		end
+
+		copycorner(root, frame)
+
+		local stroke = Instance.new('UIStroke')
+		stroke.Name = 'FiveroseTweakerPulseStroke'
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Color = Color3.new(1, 1, 1)
+		stroke.Thickness = kind == 'open' and 1.5 or 1
+		stroke.Transparency = kind == 'hover' and 0.76 or 0.58
+		stroke.Parent = frame
+
+		frame.Parent = holder
+		made[#made + 1] = frame
+
+		play(frame, kind == 'open' and 0.24 or 0.18, kind == 'open' and Enum.EasingStyle.Back or Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
+			Position = center,
+			Size = targetsize,
+			BackgroundTransparency = 1
+		})
+
+		play(stroke, kind == 'open' and 0.24 or 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
+			Transparency = 1,
+			Thickness = 0.5
+		})
+
+		task.delay(kind == 'open' and 0.28 or 0.22, function()
+			cancel(frame)
+			cancel(stroke)
+
+			if alive(frame) then
+				pcall(frame.Destroy, frame)
+			end
+		end)
 	end
 
 	local function rootsof(tab)
@@ -103,7 +256,6 @@ return function(api)
 		end
 
 		add(type(tab) == 'table' and rawget(tab, 'Container'))
-
 		local native = type(tab) == 'table' and rawget(tab, 'Native')
 		local items = type(native) == 'table' and rawget(native, 'Items')
 		add(type(items) == 'table' and rawget(items, 'Page'))
@@ -125,27 +277,9 @@ return function(api)
 		for index, root in ipairs(rootsof(tab)) do
 			local ticket = serial
 
-			task.delay((index - 1) * 0.025, function()
-				if not enabled or ticket ~= serial or not alive(root) or root.Visible == false then
-					return
-				end
-
-				local item = scale(root, 'FiveroseTweakerPageScale')
-
-				if item then
-					item.Scale = 0.975
-					play(item, 0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
-						Scale = 1
-					})
-				end
-
-				local group = canvas(root)
-
-				if alive(group) then
-					group.GroupTransparency = math.max(group.GroupTransparency, 0.28)
-					play(group, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-						GroupTransparency = 0
-					})
+			task.delay((index - 1) * 0.02, function()
+				if enabled and ticket == serial and alive(root) and root.Visible ~= false then
+					pulse(root, 'tab')
 				end
 			end)
 		end
@@ -160,7 +294,7 @@ return function(api)
 			local panel = api.native_panel
 			local items = type(panel) == 'table' and rawget(panel, 'Items')
 
-			for _, name in ipairs({'Window', 'Background', 'Outline'}) do
+			for _, name in ipairs({'Main', 'Window', 'Background', 'Outline', 'PageHolder'}) do
 				local item = type(items) == 'table' and rawget(items, name)
 
 				if alive(item) and item:IsA('GuiObject') then
@@ -179,20 +313,21 @@ return function(api)
 		return main
 	end
 
-	local function getblur()
-		if alive(blur) then
-			return blur
+	local function openstate()
+		local root = findmain()
+
+		if alive(root) then
+			if root.Visible == false then
+				return false
+			end
+
+			local size = root.AbsoluteSize
+
+			if size.X <= 4 or size.Y <= 4 then
+				return false
+			end
 		end
 
-		blur = Instance.new('BlurEffect')
-		blur.Name = 'FiveroseTweakerBlur'
-		blur.Size = 0
-		blur.Parent = lighting
-		made[#made + 1] = blur
-		return blur
-	end
-
-	local function openstate()
 		if api.backend == 'universal' then
 			local panel = api.native_panel
 			local value = type(panel) == 'table' and rawget(panel, 'Open')
@@ -201,8 +336,6 @@ return function(api)
 				return value
 			end
 		end
-
-		local root = findmain()
 
 		if alive(root) then
 			return root.Visible
@@ -219,37 +352,17 @@ return function(api)
 		local root = findmain()
 
 		if alive(root) then
-			local item = scale(root, 'FiveroseTweakerWindowScale')
-
-			if item then
-				item.Scale = 0.94
-				play(item, 0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out, {
-					Scale = 1
-				})
-			end
-
-			local group = canvas(root)
-
-			if alive(group) then
-				group.GroupTransparency = math.max(group.GroupTransparency, 0.34)
-				play(group, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-					GroupTransparency = 0
-				})
-			end
+			pulse(root, 'open')
 		end
 
 		local effect = getblur()
-		effect.Size = math.min(effect.Size, 2)
-		play(effect, 0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-			Size = 6
-		})
+		effect.Size = math.min(effect.Size, 1)
+		play(effect, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Size = 5})
 	end
 
 	local function animateclose()
 		if alive(blur) then
-			play(blur, 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-				Size = 0
-			})
+			play(blur, 0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {Size = 0})
 		end
 	end
 
@@ -283,25 +396,11 @@ return function(api)
 				end
 			end)
 
-			local item = scale(button, 'FiveroseTweakerHoverScale')
-
-			if item then
-				connect(button.MouseEnter, function()
-					if enabled then
-						play(item, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-							Scale = 1.025
-						})
-					end
-				end)
-
-				connect(button.MouseLeave, function()
-					if enabled then
-						play(item, 0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-							Scale = 1
-						})
-					end
-				end)
-			end
+			connect(button.MouseEnter, function()
+				if enabled then
+					pulse(button, 'hover')
+				end
+			end)
 		end
 	end
 
@@ -330,14 +429,16 @@ return function(api)
 		end
 
 		blur = nil
+		layer = nil
 		main = nil
 		lastopen = nil
 		bound = setmetatable({}, {__mode = 'k'})
-		scales = setmetatable({}, {__mode = 'k'})
+		pulseat = setmetatable({}, {__mode = 'k'})
 	end
 
 	local function start()
 		stop()
+		removelegacy()
 		enabled = true
 		serial = serial + 1
 		local ticket = serial
@@ -374,6 +475,8 @@ return function(api)
 		end
 	end
 
+	removelegacy()
+
 	local box = api.vape_settings_box
 	local ownbox = false
 
@@ -383,9 +486,7 @@ return function(api)
 		for _, wanted in ipairs({'ui settings', 'settings'}) do
 			for key, tab in pairs(tabs) do
 				local name = tostring(key):lower()
-				local other = type(tab) == 'table'
-					and tostring(rawget(tab, 'Name') or ''):lower()
-					or ''
+				local other = type(tab) == 'table' and tostring(rawget(tab, 'Name') or ''):lower() or ''
 
 				if name == wanted or other == wanted then
 					settings = tab
@@ -406,11 +507,7 @@ return function(api)
 		ownbox = true
 	end
 
-	box:AddToggle(id, {
-		Text = 'Smooth UI Animations',
-		Default = false
-	})
-
+	box:AddToggle(id, {Text = 'Smooth UI Animations', Default = false})
 	local toggle = toggles[id]
 
 	if type(toggle) ~= 'table' then
@@ -427,12 +524,14 @@ return function(api)
 		else
 			enabled = false
 			stop()
+			removelegacy()
 		end
 	end)
 
 	api:clean(function()
 		enabled = false
 		stop()
+		removelegacy()
 		api.nokey[id] = nil
 		api:disown(id)
 
