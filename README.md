@@ -70,5 +70,9 @@ https://fiverose.xyz
 
 https://www.youtube.com/watch?v=lhKpfmeSRKw
 
-<img width="1535" height="1024" alt="image" src="https://github.com/user-attachments/assets/6c067a25-d26d-4ca3-8fda-4c8c4d8ebc0c" />
+# PATCH LOGS
+
+[+] Added animations to the UI
+[+] Improved loading speed
+[+] Removed herobrine
 
