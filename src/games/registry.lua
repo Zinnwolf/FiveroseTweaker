@@ -1,7 +1,8 @@
 local shared = {
 	'src/modules/shared/keybinds.lua',
 	'src/modules/shared/gui_bind.lua',
-	'src/modules/shared/vape_mode.lua'
+	'src/modules/shared/vape_mode.lua',
+	'src/modules/shared/animations.lua'
 }
 
 local files = {

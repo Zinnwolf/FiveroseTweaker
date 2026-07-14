@@ -6,15 +6,14 @@ return function(api)
 	local id = 'smooth_ui_animations'
 	local enabled = false
 	local serial = 0
-	local patches = {}
 	local cons = {}
 	local made = {}
 	local tweens = setmetatable({}, {__mode = 'k'})
 	local bound = setmetatable({}, {__mode = 'k'})
 	local scales = setmetatable({}, {__mode = 'k'})
-	local positions = setmetatable({}, {__mode = 'k'})
 	local blur
 	local main
+	local lastopen
 
 	local function alive(obj)
 		return typeof(obj) == 'Instance' and obj.Parent ~= nil
@@ -46,9 +45,14 @@ return function(api)
 	end
 
 	local function connect(signal, callback)
-		local con = signal:Connect(callback)
-		cons[#cons + 1] = con
-		return con
+		local ok, con = pcall(function()
+			return signal:Connect(callback)
+		end)
+
+		if ok and con then
+			cons[#cons + 1] = con
+			return con
+		end
 	end
 
 	local function scale(root, name)
@@ -87,16 +91,6 @@ return function(api)
 		end
 	end
 
-	local function managed(root)
-		if not alive(root) or not alive(root.Parent) then
-			return true
-		end
-
-		return root.Parent:FindFirstChildOfClass('UIListLayout') ~= nil
-			or root.Parent:FindFirstChildOfClass('UIGridLayout') ~= nil
-			or root.Parent:FindFirstChildOfClass('UIPageLayout') ~= nil
-	end
-
 	local function rootsof(tab)
 		local result = {}
 		local seen = {}
@@ -132,43 +126,26 @@ return function(api)
 			local ticket = serial
 
 			task.delay((index - 1) * 0.025, function()
-				if not enabled or ticket ~= serial or not alive(root) then
+				if not enabled or ticket ~= serial or not alive(root) or root.Visible == false then
 					return
 				end
 
 				local item = scale(root, 'FiveroseTweakerPageScale')
 
 				if item then
-					item.Scale = 0.982
-					play(item, 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
+					item.Scale = 0.975
+					play(item, 0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, {
 						Scale = 1
 					})
 				end
 
 				local group = canvas(root)
-				local goal = {}
 
 				if alive(group) then
-					group.GroupTransparency = math.max(group.GroupTransparency, 0.22)
-
-					if group == root then
-						goal.GroupTransparency = 0
-					else
-						play(group, 0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-							GroupTransparency = 0
-						})
-					end
-				end
-
-				if not managed(root) then
-					local target = root.Position
-					positions[root] = target
-					root.Position = target + UDim2.fromOffset(9, 0)
-					goal.Position = target
-				end
-
-				if next(goal) then
-					play(root, 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out, goal)
+					group.GroupTransparency = math.max(group.GroupTransparency, 0.28)
+					play(group, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
+						GroupTransparency = 0
+					})
 				end
 			end)
 		end
@@ -216,8 +193,6 @@ return function(api)
 	end
 
 	local function openstate()
-		local root = findmain()
-
 		if api.backend == 'universal' then
 			local panel = api.native_panel
 			local value = type(panel) == 'table' and rawget(panel, 'Open')
@@ -227,6 +202,8 @@ return function(api)
 			end
 		end
 
+		local root = findmain()
+
 		if alive(root) then
 			return root.Visible
 		end
@@ -234,27 +211,18 @@ return function(api)
 		return alive(api.gui) and api.gui.Enabled
 	end
 
-	local lastopen = 0
-
 	local function animateopen()
 		if not enabled or not openstate() then
 			return
 		end
 
-		local now = os.clock()
-
-		if now - lastopen < 0.08 then
-			return
-		end
-
-		lastopen = now
 		local root = findmain()
 
 		if alive(root) then
 			local item = scale(root, 'FiveroseTweakerWindowScale')
 
 			if item then
-				item.Scale = 0.945
+				item.Scale = 0.94
 				play(item, 0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out, {
 					Scale = 1
 				})
@@ -263,7 +231,7 @@ return function(api)
 			local group = canvas(root)
 
 			if alive(group) then
-				group.GroupTransparency = math.max(group.GroupTransparency, 0.32)
+				group.GroupTransparency = math.max(group.GroupTransparency, 0.34)
 				play(group, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
 					GroupTransparency = 0
 				})
@@ -285,74 +253,22 @@ return function(api)
 		end
 	end
 
-	local function changed()
-		task.defer(function()
-			if not enabled then
-				return
-			end
-
-			if openstate() then
-				animateopen()
-			else
-				animateclose()
-			end
-		end)
-	end
-
-	local function patch(obj, name, callback)
-		if type(obj) ~= 'table' then
-			return
-		end
-
-		local ok, old = pcall(function()
-			return obj[name]
-		end)
-
-		if not ok or type(old) ~= 'function' then
-			return
-		end
-
-		local original = rawget(obj, name)
-		local wrapped = function(...)
-			local result = table.pack(old(...))
-
-			if enabled then
-				task.defer(callback)
-			end
-
-			return table.unpack(result, 1, result.n)
-		end
-
-		obj[name] = wrapped
-		patches[#patches + 1] = {
-			obj = obj,
-			name = name,
-			original = original,
-			wrapped = wrapped
-		}
-	end
-
 	local function bindtab(tab)
 		if type(tab) ~= 'table' or bound[tab] then
 			return
 		end
 
 		bound[tab] = true
-		patch(tab, 'Show', function()
-			animatepage(tab)
-		end)
 
-		local native = rawget(tab, 'Native')
-
-		if type(native) == 'table' then
-			patch(native, 'OpenTab', function()
-				animatepage(tab)
-			end)
-			patch(native, 'Show', function()
-				animatepage(tab)
+		for _, root in ipairs(rootsof(tab)) do
+			connect(root:GetPropertyChangedSignal('Visible'), function()
+				if enabled and alive(root) and root.Visible then
+					task.defer(animatepage, tab)
+				end
 			end)
 		end
 
+		local native = rawget(tab, 'Native')
 		local button = rawget(tab, 'Button')
 
 		if not alive(button) and type(native) == 'table' then
@@ -360,14 +276,20 @@ return function(api)
 			button = type(items) == 'table' and rawget(items, 'Outline')
 		end
 
-		if alive(button) and button:IsA('GuiObject') then
+		if alive(button) and button:IsA('GuiButton') then
+			connect(button.Activated, function()
+				if enabled then
+					task.defer(animatepage, tab)
+				end
+			end)
+
 			local item = scale(button, 'FiveroseTweakerHoverScale')
 
 			if item then
 				connect(button.MouseEnter, function()
 					if enabled then
 						play(item, 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out, {
-							Scale = 1.035
+							Scale = 1.025
 						})
 					end
 				end)
@@ -380,26 +302,6 @@ return function(api)
 					end
 				end)
 			end
-		end
-	end
-
-	local function bindmain()
-		local root = findmain()
-
-		if alive(root) then
-			connect(root:GetPropertyChangedSignal('Visible'), changed)
-		end
-
-		if alive(api.gui) and api.gui:IsA('ScreenGui') then
-			connect(api.gui:GetPropertyChangedSignal('Enabled'), changed)
-		end
-
-		if api.backend == 'universal' then
-			patch(api.native_panel, 'SetMenuVisible', changed)
-			patch(api.native_panel, 'ToggleMenu', changed)
-			patch(api.lib, 'Toggle', changed)
-		else
-			patch(api.lib, 'Toggle', changed)
 		end
 	end
 
@@ -417,24 +319,6 @@ return function(api)
 			tweens[obj] = nil
 		end
 
-		for root, target in pairs(positions) do
-			if alive(root) then
-				root.Position = target
-			end
-		end
-
-		table.clear(positions)
-
-		for index = #patches, 1, -1 do
-			local item = patches[index]
-
-			if type(item.obj) == 'table' and rawget(item.obj, item.name) == item.wrapped then
-				item.obj[item.name] = item.original
-			end
-
-			patches[index] = nil
-		end
-
 		for index = #made, 1, -1 do
 			local item = made[index]
 
@@ -447,6 +331,7 @@ return function(api)
 
 		blur = nil
 		main = nil
+		lastopen = nil
 		bound = setmetatable({}, {__mode = 'k'})
 		scales = setmetatable({}, {__mode = 'k'})
 	end
@@ -456,7 +341,11 @@ return function(api)
 		enabled = true
 		serial = serial + 1
 		local ticket = serial
-		bindmain()
+		lastopen = openstate()
+
+		for _, tab in pairs(tabs) do
+			bindtab(tab)
+		end
 
 		task.spawn(function()
 			while enabled and ticket == serial and api:isactive() do
@@ -464,14 +353,33 @@ return function(api)
 					bindtab(tab)
 				end
 
-				task.wait(0.35)
+				local current = openstate()
+
+				if current ~= lastopen then
+					lastopen = current
+
+					if current then
+						animateopen()
+					else
+						animateclose()
+					end
+				end
+
+				task.wait(0.05)
 			end
 		end)
 
-		task.defer(animateopen)
+		if lastopen then
+			task.defer(animateopen)
+		end
 	end
 
-	local function find()
+	local box = api.vape_settings_box
+	local ownbox = false
+
+	if type(box) ~= 'table' then
+		local settings
+
 		for _, wanted in ipairs({'ui settings', 'settings'}) do
 			for key, tab in pairs(tabs) do
 				local name = tostring(key):lower()
@@ -480,19 +388,24 @@ return function(api)
 					or ''
 
 				if name == wanted or other == wanted then
-					return tab
+					settings = tab
+					break
 				end
 			end
+
+			if settings then
+				break
+			end
 		end
+
+		if not settings then
+			error('Fiverose UI Settings tab not found')
+		end
+
+		box = settings:AddRightGroupbox('Interface')
+		ownbox = true
 	end
 
-	local tab = find()
-
-	if not tab then
-		error('Fiverose UI Settings tab not found')
-	end
-
-	local box = tab:AddRightGroupbox('Interface')
 	box:AddToggle(id, {
 		Text = 'Smooth UI Animations',
 		Default = false
@@ -523,8 +436,10 @@ return function(api)
 		api.nokey[id] = nil
 		api:disown(id)
 
-		if type(box) == 'table' and type(rawget(box, 'Destroy')) == 'function' then
+		if ownbox and type(box) == 'table' and type(rawget(box, 'Destroy')) == 'function' then
 			pcall(box.Destroy, box)
+		elseif type(toggle) == 'table' and type(rawget(toggle, 'Destroy')) == 'function' then
+			pcall(toggle.Destroy, toggle)
 		end
 	end)
 

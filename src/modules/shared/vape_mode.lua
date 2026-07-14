@@ -28,6 +28,7 @@ return function(api, entry)
 	end
 
 	local box = tab:AddRightGroupbox('Vape Modules')
+	api.vape_settings_box = box
 	box:AddToggle(id, {
 		Text = 'Use Vape Modules',
 		Default = false
@@ -147,6 +148,10 @@ return function(api, entry)
 
 	api:clean(function()
 		drop()
+
+		if api.vape_settings_box == box then
+			api.vape_settings_box = nil
+		end
 		api.disable_vape = nil
 		api.nokey[id] = nil
 		api:disown(id)
