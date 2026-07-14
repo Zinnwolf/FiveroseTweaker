@@ -73,6 +73,8 @@ https://www.youtube.com/watch?v=lhKpfmeSRKw
 # PATCH LOGS
 
 [+] Added animations to the UI
+
 [+] Improved loading speed
+
 [+] Removed herobrine
 
