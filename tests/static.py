@@ -19,7 +19,6 @@ required = [
     'src/modules/shared/keybinds.lua',
     'src/modules/shared/gui_bind.lua',
     'src/modules/shared/vape_mode.lua',
-    'src/modules/shared/animations.lua',
     'src/vape/api.lua',
     'src/vape/games/universal.lua',
 ]
@@ -100,15 +99,6 @@ assert 'CreateWindow(' not in runtime
 assert 'fiverose_gui_bind_multi' not in runtime
 assert 'MultiKeybind' not in runtime
 assert "Text = 'Use Vape Modules'" in runtime
-assert "Text = 'Smooth UI Animations'" in runtime
-assert "Name = 'FiveroseTweakerBlur'" in runtime
-assert "Enum.EasingStyle.Back" in runtime
-assert "FiveroseTweakerPageScale" in runtime
-assert "api.vape_settings_box = box" in runtime
-assert "button.Activated" in runtime
-assert "task.wait(0.05)" in runtime
-assert "patch(api.native_panel" not in runtime
-assert "patch(api.lib, 'Toggle'" not in runtime
 assert "lib.ToggleKeybind = blocked" in runtime
 assert "lib.ToggleKeybind = Enum.KeyCode.Unknown" not in runtime
 assert "Blacklisted = {'MB1', 'MB2'}" in runtime
