@@ -1,4 +1,4 @@
-FiveroseTweaker adds things to fiverose
+FiveroseTweaker adds things from vape to fiverose
 
 YOU MUST OWN THE REAL FIVEROSE TO USE THIS
 
