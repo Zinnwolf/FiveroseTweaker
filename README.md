@@ -72,9 +72,6 @@ https://www.youtube.com/watch?v=lhKpfmeSRKw
 
 # PATCH LOGS
 
-[+] Added animations to the UI
+[+] Fixed movement .shared for universals
 
-[+] Improved loading speed
-
-[+] Removed herobrine
 
