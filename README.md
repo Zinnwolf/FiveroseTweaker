@@ -1,3 +1,6 @@
+# THIS PROJECT IS DISCONTINUED
+
+
 FiveroseTweaker adds things from vape to fiverose
 
 YOU MUST OWN THE REAL FIVEROSE TO USE THIS
